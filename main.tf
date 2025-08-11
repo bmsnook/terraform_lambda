@@ -31,20 +31,24 @@ resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
 
 # Create a ZIP archive of your Lambda function code
 data "archive_file" "lambda_zip" {
-  type        = "zip"
+  type = "zip"
   # source_file = "lambda_function.py" # Path to your Python Lambda code
   # output_path = "lambda_function.zip"
-  source_file = "lambda_function_signed_s3.py" # Path to your Python Lambda code
-  output_path = "lambda_function_signed_s3.zip"
+  # source_file = "lambda_function_signed_s3.py"  # Path to your Python Lambda code
+  # output_path = "lambda_function_signed_s3.zip"
+  source_file = var.lambda_source_filename # Path to your Python Lambda code
+  output_path = local.lambda_source_zipfile
 }
 
 # Create the AWS Lambda Function
 resource "aws_lambda_function" "python_lambda" {
-  function_name = "my-python-lambda"
-  runtime       = "python3.13" # Choose your desired Python runtime
-  handler       = "lambda_function.lambda_handler" # File name.handler_function_name
-  role          = aws_iam_role.lambda_exec_role.arn
-  filename      = data.archive_file.lambda_zip.output_path
+  function_name = var.lambda_function_name
+  runtime       = var.python_version # Choose your desired Python runtime
+  # handler       = "lambda_function_signed_s3.lambda_handler" # File name.handler_function_name
+  # handler       = "lambda_function.lambda_handler" # File name.handler_function_name
+  handler          = join(".", [local.lambda_source_function, "lambda_handler"]) # File name.handler_function_name
+  role             = aws_iam_role.lambda_exec_role.arn
+  filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   tags = {
@@ -54,7 +58,7 @@ resource "aws_lambda_function" "python_lambda" {
 }
 
 resource "aws_lambda_function_url" "latest_function_url" {
-  function_name = aws_lambda_function.python_lambda.function_name
+  function_name      = aws_lambda_function.python_lambda.function_name
   authorization_type = "NONE"
 
   cors {
@@ -66,6 +70,12 @@ resource "aws_lambda_function_url" "latest_function_url" {
 }
 
 # Optional: Output the Lambda function ARN
+output "lambda_function_name_created" {
+  value = aws_lambda_function.python_lambda.function_name
+}
+output "lambda_function_handler_created" {
+  value = aws_lambda_function.python_lambda.handler
+}
 output "lambda_function_arn" {
   value = aws_lambda_function.python_lambda.arn
 }
